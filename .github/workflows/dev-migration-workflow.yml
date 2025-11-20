@@ -1,0 +1,225 @@
+name: Dev Environment Migration
+
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev ]
+  workflow_dispatch:
+    inputs:
+      migration_phase:
+        description: 'Migration Phase'
+        required: true
+        default: 'validate'
+        type: choice
+        options:
+          - validate
+          - schema
+          - data
+          - full
+
+env:
+  ENVIRONMENT: dev
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  # ===========================================
+  # Job 1: Environment Setup & Validation
+  # ===========================================
+  setup-and-validate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_proceed: ${{ steps.validation.outputs.proceed }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Load Environment Config
+        run: |
+          echo "Loading dev environment configuration..."
+          cat envs/dev.yaml
+
+      - name: Validate SQL Scripts
+        id: validation
+        run: |
+          echo "Validating SQL migration scripts..."
+          python -c "
+          import os
+          import sys
+          
+          sql_dirs = ['migration/sct-output', 'migration/manual-fixes']
+          errors = []
+          
+          for dir in sql_dirs:
+              if os.path.exists(dir):
+                  sql_files = [f for f in os.listdir(dir) if f.endswith('.sql')]
+                  print(f'Found {len(sql_files)} SQL files in {dir}')
+                  
+                  # Basic validation - check for common issues
+                  for sql_file in sql_files:
+                      with open(os.path.join(dir, sql_file)) as f:
+                          content = f.read()
+                          if 'DROP TABLE' in content.upper() and 'IF EXISTS' not in content.upper():
+                              errors.append(f'{sql_file}: Unsafe DROP TABLE without IF EXISTS')
+          
+          if errors:
+              print('ERRORS FOUND:')
+              for err in errors:
+                  print(f'  - {err}')
+              sys.exit(1)
+          else:
+              print('✓ All SQL scripts validated successfully')
+          "
+          echo "proceed=true" >> $GITHUB_OUTPUT
+
+  # ===========================================
+  # Job 2: Schema Migration
+  # ===========================================
+  schema-migration:
+    runs-on: ubuntu-latest
+    needs: setup-and-validate
+    if: |
+      needs.setup-and-validate.outputs.should_proceed == 'true' &&
+      (github.event.inputs.migration_phase == 'schema' || github.event.inputs.migration_phase == 'full')
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+          POSTGRES_DB: migration_target
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Apply SCT-Generated Schema
+        run: |
+          echo "Applying SCT-generated DDL to PostgreSQL..."
+          python migration/python/run_migrations.py \
+            --env dev \
+            --phase schema \
+            --source migration/sct-output
+
+      - name: Apply Manual Fixes
+        run: |
+          echo "Applying manual schema fixes..."
+          python migration/python/run_migrations.py \
+            --env dev \
+            --phase schema \
+            --source migration/manual-fixes
+
+      - name: Validate Schema
+        run: |
+          python tests/test_schema.py --env dev
+
+  # ===========================================
+  # Job 3: Data Validation
+  # ===========================================
+  data-validation:
+    runs-on: ubuntu-latest
+    needs: [setup-and-validate, schema-migration]
+    if: |
+      needs.setup-and-validate.outputs.should_proceed == 'true' &&
+      (github.event.inputs.migration_phase == 'data' || github.event.inputs.migration_phase == 'full' || github.event.inputs.migration_phase == 'validate')
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Row Count Validation
+        run: |
+          echo "Performing row count validation..."
+          python migration/python/rowcount_validate.py --env dev
+
+      - name: Financial Reconciliation
+        run: |
+          echo "Performing financial reconciliation..."
+          python migration/python/finance_reconcile.py --env dev
+
+      - name: Data Quality Checks
+        run: |
+          echo "Running data quality checks..."
+          python tests/test_data.py --env dev
+
+      - name: Generate Validation Report
+        if: always()
+        run: |
+          echo "Generating validation report..."
+          python -c "
+          import json
+          from datetime import datetime
+          
+          report = {
+              'environment': 'dev',
+              'timestamp': datetime.now().isoformat(),
+              'phase': '${{ github.event.inputs.migration_phase }}',
+              'status': 'completed'
+          }
+          
+          with open('validation-report.json', 'w') as f:
+              json.dump(report, f, indent=2)
+          
+          print('Report saved to validation-report.json')
+          "
+
+      - name: Upload Validation Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: validation-report-dev
+          path: validation-report.json
+
+  # ===========================================
+  # Job 4: Notification
+  # ===========================================
+  notify:
+    runs-on: ubuntu-latest
+    needs: [setup-and-validate, schema-migration, data-validation]
+    if: always()
+    
+    steps:
+      - name: Migration Status
+        run: |
+          echo "Dev migration workflow completed"
+          echo "Setup: ${{ needs.setup-and-validate.result }}"
+          echo "Schema: ${{ needs.schema-migration.result }}"
+          echo "Validation: ${{ needs.data-validation.result }}"

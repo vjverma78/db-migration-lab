@@ -205,3 +205,33 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# ====== EXTRA IGNORE PATTERNS FOR MIGRATION LAB ======
+
+# Virtual environments (already mostly covered above, kept for clarity)
+venv/
+env/
+.venv/
+ENV/
+
+# Local secrets and env files
+*.env
+.secrets
+baseline_metrics.json
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
+
+# Docker logs (if any)
+*.log
+
+# Backup files
+*.bak
+*.backup

@@ -1,0 +1,48 @@
+# Database Migration Lab - Python Dependencies
+
+# Database Drivers
+psycopg[binary]>=3.2,<3.4      # PostgreSQL
+pyodbc>=5.0.1                  # SQL Server
+# cx-Oracle>=8.3.0             # Oracle (optional, requires VC++ build tools)
+pymssql>=2.2.11                # SQL Server (alternative)
+
+# Data Processing
+pandas>=2.2.0                  # Let pip pick a wheel compatible with your Python
+numpy>=1.26.0                  # Will come as a wheel on Windows
+
+# Data Validation
+great-expectations==0.18.8
+
+# Kafka & Debezium
+kafka-python==2.0.2
+# confluent-kafka==2.3.0       # Optional, needs C++ compiler
+
+# Configuration & Environment
+pyyaml==6.0.1
+python-dotenv==1.0.0
+
+# AWS LocalStack (optional)
+boto3==1.34.12
+localstack-client==2.3
+
+# CLI & Utilities
+click==8.1.7
+colorama==0.4.6
+tabulate==0.9.0
+tqdm==4.66.1
+
+# Logging & Monitoring
+loguru==0.7.2
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# HTTP & API
+requests==2.31.0
+
+# Date/Time
+python-dateutil==2.8.2
+
+# Performance
+sqlalchemy==2.0.23

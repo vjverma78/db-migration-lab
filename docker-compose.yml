@@ -1,0 +1,221 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # SQL SERVER 2022 (Source Database)
+  # ==========================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: migration-lab-sqlserver
+    hostname: sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "MigrationLab123!"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+      - ./databases/sqlserver:/init
+    networks:
+      - migration-network
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P MigrationLab123! -Q "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # ORACLE 21c XE (Source Database)
+  # ==========================================
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: migration-lab-oracle
+    hostname: oracle
+    environment:
+      ORACLE_PASSWORD: "MigrationLab123!"
+      ORACLE_DATABASE: "MIGDB"
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+      - ./databases/oracle:/init
+    networks:
+      - migration-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ==========================================
+  # POSTGRESQL 16 (Target Database)
+  # ==========================================
+  postgresql:
+    image: postgres:16-alpine
+    container_name: migration-lab-postgresql
+    hostname: postgresql
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: MigrationLab123!
+      POSTGRES_DB: migration_target
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+      - ./databases/postgresql:/docker-entrypoint-initdb.d
+    networks:
+      - migration-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # ZOOKEEPER (for Kafka)
+  # ==========================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: migration-lab-zookeeper
+    hostname: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - migration-network
+
+  # ==========================================
+  # KAFKA (Event Streaming for CDC)
+  # ==========================================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: migration-lab-kafka
+    hostname: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - migration-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # DEBEZIUM CONNECT (CDC Connector)
+  # ==========================================
+  debezium:
+    image: debezium/connect:2.4
+    container_name: migration-lab-debezium
+    hostname: debezium
+    depends_on:
+      - kafka
+      - sqlserver
+      - postgresql
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_statuses
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+    ports:
+      - "8083:8083"
+    networks:
+      - migration-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # LOCALSTACK (AWS Services Simulation)
+  # Optional - for S3, Secrets Manager testing
+  # ==========================================
+  localstack:
+    image: localstack/localstack:latest
+    container_name: migration-lab-localstack
+    hostname: localstack
+    environment:
+      SERVICES: s3,secretsmanager
+      DEBUG: 0
+      DATA_DIR: /tmp/localstack/data
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"  # LocalStack gateway
+    volumes:
+      - localstack-data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - migration-network
+
+  # ==========================================
+  # PGADMIN (PostgreSQL GUI - Optional)
+  # ==========================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: migration-lab-pgadmin
+    hostname: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@migrationlab.local
+      PGADMIN_DEFAULT_PASSWORD: MigrationLab123!
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - migration-network
+    depends_on:
+      - postgresql
+
+# ==========================================
+# NETWORKS
+# ==========================================
+networks:
+  migration-network:
+    driver: bridge
+    name: migration-network
+
+# ==========================================
+# VOLUMES (Persistent Data)
+# ==========================================
+volumes:
+  sqlserver-data:
+    name: migration-lab-sqlserver-data
+  oracle-data:
+    name: migration-lab-oracle-data
+  postgresql-data:
+    name: migration-lab-postgresql-data
+  zookeeper-data:
+    name: migration-lab-zookeeper-data
+  zookeeper-logs:
+    name: migration-lab-zookeeper-logs
+  kafka-data:
+    name: migration-lab-kafka-data
+  localstack-data:
+    name: migration-lab-localstack-data
+  pgadmin-data:
+    name: migration-lab-pgadmin-data
