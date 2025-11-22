@@ -142,7 +142,7 @@ jobs:
         run: |
           python tests/test_schema.py --env dev
 
-  # ===========================================
+   # ===========================================
   # Job 3: Data Validation
   # ===========================================
   data-validation:
@@ -152,6 +152,46 @@ jobs:
       needs.setup-and-validate.outputs.should_proceed == 'true' &&
       (github.event.inputs.migration_phase == 'data' || github.event.inputs.migration_phase == 'full' || github.event.inputs.migration_phase == 'validate')
     
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd " /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $${SA_PASSWORD} -Q \"SELECT 1\" " 
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+          POSTGRES_DB: migration_target
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SRC_SQLSERVER_CONN_STR: >
+        Driver={ODBC Driver 18 for SQL Server};
+        Server=localhost,1433;
+        Database=AdventureWorksLite;
+        Uid=sa;
+        Pwd=${{ secrets.DB_DEV_PASSWORD }};
+        Encrypt=yes;
+        TrustServerCertificate=yes;
+      TGT_POSTGRES_CONN_STR: >
+        host=localhost port=5432 dbname=migration_target user=postgres password=${{ secrets.DB_DEV_PASSWORD }}
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -165,20 +205,20 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Row Count Validation
+      - name: Wait for Databases
         run: |
-          echo "Performing row count validation..."
-          python migration/python/rowcount_validate.py --env dev
+          echo "Waiting for SQL Server and Postgres to be ready..."
+          sleep 40
 
-      - name: Financial Reconciliation
+      - name: Run Bulk Migration
         run: |
-          echo "Performing financial reconciliation..."
-          python migration/python/finance_reconcile.py --env dev
+          echo "Running bulk migration SQL Server -> PostgreSQL..."
+          python migration/python/bulk_migrate.py
 
-      - name: Data Quality Checks
+      - name: Run Validation (rowcount + metrics + samples)
         run: |
-          echo "Running data quality checks..."
-          python tests/test_data.py --env dev
+          echo "Running migration validation..."
+          python migration/python/validate_migration.py
 
       - name: Generate Validation Report
         if: always()
