@@ -282,7 +282,7 @@ jobs:
 
       - name: Upload Validation Report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: validation-report-dev
           path: validation-report.json
