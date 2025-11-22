@@ -119,6 +119,14 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+      POSTGRES_DB: migration_target
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      DB_DEV_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
