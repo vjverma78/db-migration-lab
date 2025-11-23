@@ -56,25 +56,90 @@ def _agg_sqlserver(conn_str: str) -> Dict[Tuple[str, str], Tuple[float, float, f
     return result
 
 
-def _agg_postgres(conn_str: str) -> Dict[str, float]:
+def _agg_postgres(conn_str: str) -> Dict[str, Dict[str, float]]:
+    metrics: Dict[str, Dict[str, float]] = {}
     with psycopg.connect(conn_str) as conn:
         cur = conn.cursor()
+
+        # customers.customerid
         cur.execute("""
-            SELECT
-                COUNT(c.customerid)              AS customers_count,
-                COALESCE(SUM(o.totalamount), 0)  AS total_revenue,
-                COALESCE(AVG(o.totalamount), 0)  AS avg_order_value
-            FROM adventureworkslite_dbo.customers c
-            LEFT JOIN adventureworkslite_dbo.orders o
-                ON o.customerid = c.customerid;
+            SELECT COUNT(customerid), SUM(customerid), MAX(customerid)
+            FROM adventureworkslite_dbo.customers;
         """)
-        customers_count, total_revenue, avg_order_value = cur.fetchone()
-        return {
-            "customers_count": customers_count,
-            "total_revenue": float(total_revenue),
-            "avg_order_value": float(avg_order_value),
+        cnt, s, mx = cur.fetchone()
+        metrics["customers.customer_id"] = {
+            "cnt": float(cnt or 0),
+            "sum": float(s or 0),
+            "max": float(mx or 0),
         }
 
+        # orders.orderid, orders.totalamount
+        cur.execute("""
+            SELECT COUNT(orderid), SUM(orderid), MAX(orderid),
+                   COUNT(totalamount), SUM(totalamount), MAX(totalamount)
+            FROM adventureworkslite_dbo.orders;
+        """)
+        ocnt, osum, omax, tcnt, tsum, tmax = cur.fetchone()
+        metrics["orders.order_id"] = {
+            "cnt": float(ocnt or 0),
+            "sum": float(osum or 0),
+            "max": float(omax or 0),
+        }
+        metrics["orders.total_amount"] = {
+            "cnt": float(tcnt or 0),
+            "sum": float(tsum or 0),
+            "max": float(tmax or 0),
+        }
+
+        # order_items.orderitemid, quantity, unitprice
+        cur.execute("""
+            SELECT COUNT(orderitemid), SUM(orderitemid), MAX(orderitemid),
+                   COUNT(quantity), SUM(quantity), MAX(quantity),
+                   COUNT(unitprice), SUM(unitprice), MAX(unitprice)
+            FROM adventureworkslite_dbo.orderitems;
+        """)
+        icnt, isum, imax, qcnt, qsum, qmax, pcnt, psum, pmax = cur.fetchone()
+        metrics["order_items.order_item_id"] = {
+            "cnt": float(icnt or 0),
+            "sum": float(isum or 0),
+            "max": float(imax or 0),
+        }
+        metrics["order_items.quantity"] = {
+            "cnt": float(qcnt or 0),
+            "sum": float(qsum or 0),
+            "max": float(qmax or 0),
+        }
+        metrics["order_items.unit_price"] = {
+            "cnt": float(pcnt or 0),
+            "sum": float(psum or 0),
+            "max": float(pmax or 0),
+        }
+
+        # products.productid, price, stockquantity
+        cur.execute("""
+            SELECT COUNT(productid), SUM(productid), MAX(productid),
+                   COUNT(price), SUM(price), MAX(price),
+                   COUNT(stockquantity), SUM(stockquantity), MAX(stockquantity)
+            FROM adventureworkslite_dbo.products;
+        """)
+        pcnt2, psum2, pmax2, prcnt, prsum, prmax, scnt, ssum, smax = cur.fetchone()
+        metrics["products.product_id"] = {
+            "cnt": float(pcnt2 or 0),
+            "sum": float(psum2 or 0),
+            "max": float(pmax2 or 0),
+        }
+        metrics["products.price"] = {
+            "cnt": float(prcnt or 0),
+            "sum": float(prsum or 0),
+            "max": float(prmax or 0),
+        }
+        metrics["products.stock_quantity"] = {
+            "cnt": float(scnt or 0),
+            "sum": float(ssum or 0),
+            "max": float(smax or 0),
+        }
+
+    return metrics
 
 
 def validate_metrics(sqlserver_conn: str, postgres_conn: str, tol: float = 1e-6) -> bool:
