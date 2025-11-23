@@ -50,6 +50,7 @@ jobs:
     env:
       ENVIRONMENT: dev
       PYTHON_VERSION: "3.10"
+      PYTHONPATH: migration/python
       SRC_SQLSERVER_CONN_STR: >
         Driver={ODBC Driver 18 for SQL Server};
         Server=localhost,1433;
