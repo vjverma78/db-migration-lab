@@ -9,10 +9,10 @@ logger = logging.getLogger(__name__)
 
 TABLE_KEY_MAP = {
     # source_table -> (target_table, pk_source, pk_target)
-    "Customers": ("customers", "CustomerID", "customer_id"),
-    "Orders": ("orders", "OrderID", "order_id"),
-    "OrderItems": ("order_items", "OrderItemID", "order_item_id"),
-    "Products": ("products", "ProductID", "product_id"),
+    "Customers": ("adventureworkslite_dbo.customers", "CustomerID", "customerid"),
+    "Orders": ("adventureworkslite_dbo.orders", "OrderID", "orderid"),
+    "OrderItems": ("adventureworkslite_dbo.orderitems", "OrderItemID", "orderitemid"),
+    "Products": ("adventureworkslite_dbo.products", "ProductID", "productid"),
 }
 
 
