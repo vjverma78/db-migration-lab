@@ -61,7 +61,7 @@ def _agg_postgres(conn_str: str) -> Dict[str, Dict[str, float]]:
     with psycopg.connect(conn_str) as conn:
         cur = conn.cursor()
 
-        # customers.customerid
+        # customers.customer_id  -> customers.customerid
         cur.execute("""
             SELECT COUNT(customerid), SUM(customerid), MAX(customerid)
             FROM adventureworkslite_dbo.customers;
@@ -73,10 +73,11 @@ def _agg_postgres(conn_str: str) -> Dict[str, Dict[str, float]]:
             "max": float(mx or 0),
         }
 
-        # orders.orderid, orders.totalamount
+        # orders.order_id and orders.total_amount
         cur.execute("""
-            SELECT COUNT(orderid), SUM(orderid), MAX(orderid),
-                   COUNT(totalamount), SUM(totalamount), MAX(totalamount)
+            SELECT
+                COUNT(orderid), SUM(orderid), MAX(orderid),
+                COUNT(totalamount), SUM(totalamount), MAX(totalamount)
             FROM adventureworkslite_dbo.orders;
         """)
         ocnt, osum, omax, tcnt, tsum, tmax = cur.fetchone()
@@ -91,11 +92,12 @@ def _agg_postgres(conn_str: str) -> Dict[str, Dict[str, float]]:
             "max": float(tmax or 0),
         }
 
-        # order_items.orderitemid, quantity, unitprice
+        # order_items.*  -> orderitems.*
         cur.execute("""
-            SELECT COUNT(orderitemid), SUM(orderitemid), MAX(orderitemid),
-                   COUNT(quantity), SUM(quantity), MAX(quantity),
-                   COUNT(unitprice), SUM(unitprice), MAX(unitprice)
+            SELECT
+                COUNT(orderitemid), SUM(orderitemid), MAX(orderitemid),
+                COUNT(quantity),     SUM(quantity),     MAX(quantity),
+                COUNT(unitprice),    SUM(unitprice),    MAX(unitprice)
             FROM adventureworkslite_dbo.orderitems;
         """)
         icnt, isum, imax, qcnt, qsum, qmax, pcnt, psum, pmax = cur.fetchone()
@@ -115,18 +117,19 @@ def _agg_postgres(conn_str: str) -> Dict[str, Dict[str, float]]:
             "max": float(pmax or 0),
         }
 
-        # products.productid, price, stockquantity
+        # products.*  -> products.*
         cur.execute("""
-            SELECT COUNT(productid), SUM(productid), MAX(productid),
-                   COUNT(price), SUM(price), MAX(price),
-                   COUNT(stockquantity), SUM(stockquantity), MAX(stockquantity)
+            SELECT
+                COUNT(productid),    SUM(productid),    MAX(productid),
+                COUNT(price),        SUM(price),        MAX(price),
+                COUNT(stockquantity),SUM(stockquantity),MAX(stockquantity)
             FROM adventureworkslite_dbo.products;
         """)
-        pcnt2, psum2, pmax2, prcnt, prsum, prmax, scnt, ssum, smax = cur.fetchone()
+        pcnt, psum, pmax, prcnt, prsum, prmax, scnt, ssum, smax = cur.fetchone()
         metrics["products.product_id"] = {
-            "cnt": float(pcnt2 or 0),
-            "sum": float(psum2 or 0),
-            "max": float(pmax2 or 0),
+            "cnt": float(pcnt or 0),
+            "sum": float(psum or 0),
+            "max": float(pmax or 0),
         }
         metrics["products.price"] = {
             "cnt": float(prcnt or 0),
@@ -140,6 +143,7 @@ def _agg_postgres(conn_str: str) -> Dict[str, Dict[str, float]]:
         }
 
     return metrics
+
 
 
 def validate_metrics(sqlserver_conn: str, postgres_conn: str, tol: float = 1e-6) -> bool:
