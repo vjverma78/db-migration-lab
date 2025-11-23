@@ -51,6 +51,9 @@ jobs:
       ENVIRONMENT: dev
       PYTHON_VERSION: "3.10"
       PYTHONPATH: migration/python
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "MigrationLab123!"
+      POSTGRES_DB: migration_target
       SRC_SQLSERVER_CONN_STR: >
         Driver={ODBC Driver 18 for SQL Server};
         Server=localhost,1433;
