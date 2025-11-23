@@ -56,22 +56,25 @@ def _agg_sqlserver(conn_str: str) -> Dict[Tuple[str, str], Tuple[float, float, f
     return result
 
 
-def _agg_postgres(conn_str: str) -> Dict[Tuple[str, str], Tuple[float, float, float]]:
-    """
-    Return {(target_table, target_col): (count, sum, max)} from Postgres.
-    """
-    result = {}
+def _agg_postgres(conn_str: str) -> Dict[str, float]:
     with psycopg.connect(conn_str) as conn:
         cur = conn.cursor()
-        for tgt_tbl, cols in NUMERIC_COLUMNS.items():
-            for tgt_col in cols:
-                cur.execute(f"""
-                    SELECT COUNT({tgt_col}), SUM({tgt_col}::double precision), MAX({tgt_col}::double precision)
-                    FROM {tgt_tbl};
-                """)
-                cnt, s, mx = cur.fetchone()
-                result[(tgt_tbl, tgt_col)] = (float(cnt or 0), float(s or 0), float(mx or 0))
-    return result
+        cur.execute("""
+            SELECT
+                COUNT(c.customerid)              AS customers_count,
+                COALESCE(SUM(o.totalamount), 0)  AS total_revenue,
+                COALESCE(AVG(o.totalamount), 0)  AS avg_order_value
+            FROM adventureworkslite_dbo.customers c
+            LEFT JOIN adventureworkslite_dbo.orders o
+                ON o.customerid = c.customerid;
+        """)
+        customers_count, total_revenue, avg_order_value = cur.fetchone()
+        return {
+            "customers_count": customers_count,
+            "total_revenue": float(total_revenue),
+            "avg_order_value": float(avg_order_value),
+        }
+
 
 
 def validate_metrics(sqlserver_conn: str, postgres_conn: str, tol: float = 1e-6) -> bool:
