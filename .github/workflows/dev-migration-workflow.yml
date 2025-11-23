@@ -181,7 +181,7 @@ jobs:
       needs.setup-and-validate.outputs.should_proceed == 'true' &&
       (github.event.inputs.migration_phase == 'data' || github.event.inputs.migration_phase == 'full' || github.event.inputs.migration_phase == 'validate')
     
-      services:
+    services:
       sqlserver:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
