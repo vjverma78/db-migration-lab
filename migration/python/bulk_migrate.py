@@ -29,32 +29,32 @@ TARGET_CONN = {
 }
 
 TABLE_PAIRS = [
-    # (source_table, target_table, column_list_source, column_list_target)
     (
         "Customers",
-        "customers",
+        "adventureworkslite_dbo.customers",
         ["CustomerID", "FirstName", "LastName", "Email", "Phone", "CreatedDate", "ModifiedDate"],
-        ["customer_id", "first_name", "last_name", "email", "phone", "created_date", "modified_date"],
+        ["customerid", "firstname", "lastname", "email", "phone", "createddate", "modifieddate"],
     ),
     (
         "Products",
-        "products",
+        "adventureworkslite_dbo.products",
         ["ProductID", "ProductName", "Category", "Price", "StockQuantity", "CreatedDate"],
-        ["product_id", "product_name", "category", "price", "stock_quantity", "created_date"],
+        ["productid", "productname", "category", "price", "stockquantity", "createddate"],
     ),
     (
         "Orders",
-        "orders",
+        "adventureworkslite_dbo.orders",
         ["OrderID", "CustomerID", "OrderDate", "TotalAmount", "Status"],
-        ["order_id", "customer_id", "order_date", "total_amount", "status"],
+        ["orderid", "customerid", "orderdate", "totalamount", "status"],
     ),
     (
         "OrderItems",
-        "order_items",
+        "adventureworkslite_dbo.orderitems",
         ["OrderItemID", "OrderID", "ProductID", "Quantity", "UnitPrice"],
-        ["order_item_id", "order_id", "product_id", "quantity", "unit_price"],
+        ["orderitemid", "orderid", "productid", "quantity", "unitprice"],
     ),
 ]
+
 
 
 def migrate_table(src_cur, tgt_cur, src_table, tgt_table, src_cols, tgt_cols):
