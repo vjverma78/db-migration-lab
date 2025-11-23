@@ -7,11 +7,12 @@ import psycopg
 logger = logging.getLogger(__name__)
 
 TABLE_MAP = {
-    "Customers": "customers",
-    "Orders": "orders",
-    "OrderItems": "order_items",
-    "Products": "products",
+    "Customers": "adventureworkslite_dbo.customers",
+    "Orders": "adventureworkslite_dbo.orders",
+    "OrderItems": "adventureworkslite_dbo.orderitems",
+    "Products": "adventureworkslite_dbo.products",
 }
+
 
 
 def _get_sqlserver_counts(conn_str: str) -> Dict[str, int]:
@@ -36,16 +37,14 @@ def _get_postgres_counts(conn_str: str) -> Dict[str, int]:
     counts = {}
     with psycopg.connect(conn_str) as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = 'public'
-              AND table_name IN ('customers','orders','order_items','products')
-              AND table_type = 'BASE TABLE';
-        """)
-        tables = [r[0] for r in cur.fetchall()]
-        for tbl in tables:
-            cur.execute(f'SELECT COUNT(*) FROM "{tbl}";')
+        # We now know exact table names; just count them directly
+        for tbl in [
+            "adventureworkslite_dbo.customers",
+            "adventureworkslite_dbo.orders",
+            "adventureworkslite_dbo.orderitems",
+            "adventureworkslite_dbo.products",
+        ]:
+            cur.execute(f"SELECT COUNT(*) FROM {tbl};")
             (row_count,) = cur.fetchone()
             counts[tbl] = int(row_count)
     return counts
