@@ -181,19 +181,21 @@ jobs:
       needs.setup-and-validate.outputs.should_proceed == 'true' &&
       (github.event.inputs.migration_phase == 'data' || github.event.inputs.migration_phase == 'full' || github.event.inputs.migration_phase == 'validate')
     
-    services:
+      services:
       sqlserver:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: "Y"
-          SA_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+          MSSQL_SA_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+          MSSQL_PID: "Developer"
         ports:
           - 1433:1433
         options: >-
-          --health-cmd " /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $${SA_PASSWORD} -Q \"SELECT 1\" -b -C || exit 1 " 
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $${MSSQL_SA_PASSWORD} -Q \"SELECT 1\" -b -C || exit 1"
           --health-interval 15s
           --health-timeout 10s
           --health-retries 40
+
 
       postgres:
         image: postgres:16-alpine
