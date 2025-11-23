@@ -32,29 +32,32 @@ TABLE_PAIRS = [
     (
         "Customers",
         "adventureworkslite_dbo.customers",
-        ["CustomerID", "FirstName", "LastName", "Email", "Phone", "CreatedDate", "ModifiedDate"],
-        ["customerid", "firstname", "lastname", "email", "phone", "createddate", "modifieddate"],
+        # Drop CustomerID; let Postgres assign customerid
+        ["FirstName", "LastName", "Email", "Phone", "CreatedDate", "ModifiedDate"],
+        ["firstname", "lastname", "email", "phone", "createddate", "modifieddate"],
     ),
     (
         "Products",
         "adventureworkslite_dbo.products",
-        ["ProductID", "ProductName", "Category", "Price", "StockQuantity", "CreatedDate"],
-        ["productid", "productname", "category", "price", "stockquantity", "createddate"],
+        # Drop ProductID
+        ["ProductName", "Category", "Price", "StockQuantity", "CreatedDate"],
+        ["productname", "category", "price", "stockquantity", "createddate"],
     ),
     (
         "Orders",
         "adventureworkslite_dbo.orders",
-        ["OrderID", "CustomerID", "OrderDate", "TotalAmount", "Status"],
-        ["orderid", "customerid", "orderdate", "totalamount", "status"],
+        # Drop OrderID
+        ["CustomerID", "OrderDate", "TotalAmount", "Status"],
+        ["customerid", "orderdate", "totalamount", "status"],
     ),
     (
         "OrderItems",
         "adventureworkslite_dbo.orderitems",
-        ["OrderItemID", "OrderID", "ProductID", "Quantity", "UnitPrice"],
-        ["orderitemid", "orderid", "productid", "quantity", "unitprice"],
+        # Drop OrderItemID
+        ["OrderID", "ProductID", "Quantity", "UnitPrice"],
+        ["orderid", "productid", "quantity", "unitprice"],
     ),
 ]
-
 
 
 def migrate_table(src_cur, tgt_cur, src_table, tgt_table, src_cols, tgt_cols):
