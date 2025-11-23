@@ -1,3 +1,5 @@
+CREATE SCHEMA IF NOT EXISTS adventureworkslite_dbo;
+
 -- ------------ Write DROP-FOREIGN-KEY-CONSTRAINT-stage scripts -----------
 
 ALTER TABLE adventureworkslite_dbo.orderitems DROP CONSTRAINT fk_orderitems_orders_1157579162;
