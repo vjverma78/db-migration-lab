@@ -275,6 +275,17 @@ jobs:
           echo "Waiting for SQL Server and Postgres to be ready..."
           sleep 40
 
+      - name: Initialize SQL Server from init.sql and seed-data.sql
+        run: |
+          echo "Creating and initializing AdventureWorksLite from SQL scripts..."
+          /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "MigrationLab123!" -C -d master \
+            -i databases/sqlserver/init.sql
+
+          /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "MigrationLab123!" -C -d AdventureWorksLite \
+            -i databases/sqlserver/seed-data.sql
+
       - name: Run Bulk Migration
         run: |
           echo "Running bulk migration SQL Server -> PostgreSQL..."
