@@ -186,12 +186,12 @@ jobs:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: "Y"
-          MSSQL_SA_PASSWORD: ${{ secrets.DB_DEV_PASSWORD }}
+          MSSQL_SA_PASSWORD: "MigrationLab123!"
           MSSQL_PID: "Developer"
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q \"SELECT 1\" -b -C || exit 1"
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"MigrationLab123!\" -Q \"SELECT 1\" -b -C || exit 1"
           --health-interval 15s
           --health-timeout 10s
           --health-retries 40
@@ -216,11 +216,11 @@ jobs:
         Server=localhost,1433;
         Database=AdventureWorksLite;
         Uid=sa;
-        Pwd=${{ secrets.DB_DEV_PASSWORD }};
+        Pwd=MigrationLab123!;
         Encrypt=yes;
         TrustServerCertificate=yes;
       TGT_POSTGRES_CONN_STR: >
-        host=localhost port=5432 dbname=migration_target user=postgres password=${{ secrets.DB_DEV_PASSWORD }}
+        host=localhost port=5432 dbname=migration_target user=postgres password=MigrationLab123!
 
     steps:
       - name: Checkout Code
