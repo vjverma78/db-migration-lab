@@ -1,0 +1,37 @@
+name: AWS smoke test (RDS + S3)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
+      RDS_PORT: ${{ secrets.RDS_PORT }}
+      RDS_DB_NAME: ${{ secrets.RDS_DB_NAME }}   # postgres
+      RDS_USERNAME: ${{ secrets.RDS_USERNAME }}
+      RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+      REPORTS_BUCKET_NAME: ${{ secrets.REPORTS_BUCKET_NAME }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI and psql
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli postgresql-client
+
+      - name: Test S3 write
+        run: |
+          echo "hello from github actions" > test.txt
+          aws s3 cp test.txt s3://$REPORTS_BUCKET_NAME/test-from-ci.txt
+
+      - name: Test RDS connection
+        run: |
+          PGPASSWORD="$RDS_PASSWORD" psql \
+            "host=$RDS_ENDPOINT port=$RDS_PORT dbname=$RDS_DB_NAME user=$RDS_USERNAME sslmode=require" \
+            -c "SELECT now();"
