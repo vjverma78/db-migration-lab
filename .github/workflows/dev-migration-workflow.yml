@@ -222,4 +222,16 @@ jobs:
         run: |
           python migration/python/aws/upload_validation_report.py
 
+      - name: List objects in LocalStack S3 (debug)
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:4566
+        run: |
+          pip install awscli-local
+          awslocal s3 ls s3://migration-validation-reports
+          awslocal s3 ls s3://migration-validation-reports/dev/
+
       
