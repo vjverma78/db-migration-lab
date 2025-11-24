@@ -4,7 +4,6 @@ from pathlib import Path
 
 import boto3
 
-
 QUEUE_NAME = os.getenv("MIGRATION_STATUS_QUEUE", "migration-status-queue")
 REPORT_PATH = Path("validation-report.json")
 
@@ -13,21 +12,21 @@ def main() -> None:
     if REPORT_PATH.exists():
         with REPORT_PATH.open("r", encoding="utf-8") as f:
             report = json.load(f)
-        status = "SUCCESS" if report.get("overall_ok") else "FAILED"
+
+        # Map report fields directly
+        status = report.get("status", "unknown")
         payload = {
-            "environment": os.getenv("ENVIRONMENT", "dev"),
+            "environment": report.get("environment", os.getenv("ENVIRONMENT", "dev")),
+            "timestamp": report.get("timestamp"),
+            "phase": report.get("phase"),
             "status": status,
-            "rowcount_ok": report.get("rowcount_ok"),
-            "metrics_ok": report.get("metrics_ok"),
-            "samples_ok": report.get("samples_ok"),
         }
     else:
         payload = {
             "environment": os.getenv("ENVIRONMENT", "dev"),
-            "status": "UNKNOWN",
-            "rowcount_ok": None,
-            "metrics_ok": None,
-            "samples_ok": None,
+            "timestamp": None,
+            "phase": None,
+            "status": "unknown",
         }
 
     endpoint_url = os.getenv("AWS_ENDPOINT_URL", "http://localhost:4566")
