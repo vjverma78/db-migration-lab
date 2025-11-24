@@ -1,0 +1,13 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Dev migration lab - LocalStack S3 + SQS
+
+Resources:
+  MigrationReportBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: migration-validation-reports
+
+  MigrationStatusQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: migration-status-queue
