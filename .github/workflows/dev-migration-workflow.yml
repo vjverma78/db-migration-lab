@@ -52,7 +52,7 @@ jobs:
         ports:
           - 4566:4566
         env:
-          SERVICES: s3,sqs
+          SERVICES: s3,sqs,cloudformation
           DEBUG: "1"
         options: >-
           -e AWS_ACCESS_KEY_ID=test
