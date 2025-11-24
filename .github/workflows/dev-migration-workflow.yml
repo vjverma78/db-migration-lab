@@ -47,6 +47,18 @@ jobs:
           --health-timeout 5s
           --health-retries 15
 
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3,sqs
+          DEBUG: "1"
+        options: >-
+          -e AWS_ACCESS_KEY_ID=test
+          -e AWS_SECRET_ACCESS_KEY=test
+          -e AWS_REGION=us-east-1
+
     env:
       ENVIRONMENT: dev
       PYTHON_VERSION: "3.10"
@@ -98,6 +110,17 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
+          pip install awscli-local boto3
+
+      - name: Create LocalStack S3 bucket and SQS queue
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:4566
+        run: |
+          awslocal s3 mb s3://migration-validation-reports || true
+          awslocal sqs create-queue --queue-name migration-status-queue || true
 
       - name: Wait for databases
         run: |
@@ -181,9 +204,34 @@ jobs:
           print("Report saved to validation-report.json")
           EOF
 
-      - name: Upload validation report
+      - name: Upload validation report (artifact)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: validation-report-dev
           path: validation-report.json
+
+      - name: Upload validation report to LocalStack S3
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:4566
+          MIGRATION_REPORT_BUCKET: migration-validation-reports
+        run: |
+          python migration/python/aws/upload_validation_report.py
+
+      - name: Send migration status to LocalStack SQS
+        if: always()
+        env:
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:4566
+          MIGRATION_STATUS_QUEUE: migration-status-queue
+          ENVIRONMENT: dev
+        run: |
+          python migration/python/aws/send_status_message.py
+
+      
