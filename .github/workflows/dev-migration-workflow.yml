@@ -112,15 +112,18 @@ jobs:
           pip install -r requirements.txt
           pip install awscli-local boto3
 
-      - name: Create LocalStack S3 bucket and SQS queue
+      - name: Deploy CloudFormation stack to LocalStack
         env:
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_REGION: us-east-1
           AWS_ENDPOINT_URL: http://localhost:4566
         run: |
-          awslocal s3 mb s3://migration-validation-reports || true
-          awslocal sqs create-queue --queue-name migration-status-queue || true
+          aws --endpoint-url "$AWS_ENDPOINT_URL" \
+            cloudformation deploy \
+            --stack-name migration-lab-dev \
+            --template-file cloudformation/localstack-dev.yml \
+            --no-fail-on-empty-changeset
 
       - name: Wait for databases
         run: |
