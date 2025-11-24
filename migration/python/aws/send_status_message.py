@@ -10,8 +10,25 @@ REPORT_PATH = Path("validation-report.json")
 
 
 def main() -> None:
-    # Determine status from report file presence (simple version)
-    status = "SUCCESS" if REPORT_PATH.exists() else "UNKNOWN"
+    if REPORT_PATH.exists():
+        with REPORT_PATH.open("r", encoding="utf-8") as f:
+            report = json.load(f)
+        status = "SUCCESS" if report.get("overall_ok") else "FAILED"
+        payload = {
+            "environment": os.getenv("ENVIRONMENT", "dev"),
+            "status": status,
+            "rowcount_ok": report.get("rowcount_ok"),
+            "metrics_ok": report.get("metrics_ok"),
+            "samples_ok": report.get("samples_ok"),
+        }
+    else:
+        payload = {
+            "environment": os.getenv("ENVIRONMENT", "dev"),
+            "status": "UNKNOWN",
+            "rowcount_ok": None,
+            "metrics_ok": None,
+            "samples_ok": None,
+        }
 
     endpoint_url = os.getenv("AWS_ENDPOINT_URL", "http://localhost:4566")
 
@@ -23,21 +40,14 @@ def main() -> None:
         region_name=os.getenv("AWS_REGION", "us-east-1"),
     )
 
-    # Resolve queue URL
     resp = sqs.get_queue_url(QueueName=QUEUE_NAME)
     queue_url = resp["QueueUrl"]
 
-    body = {
-        "environment": os.getenv("ENVIRONMENT", "dev"),
-        "status": status,
-        "report_path": str(REPORT_PATH),
-    }
-
-    print(f"Sending status message to {queue_url}: {body}")
+    print(f"Sending status message to {queue_url}: {payload}")
 
     sqs.send_message(
         QueueUrl=queue_url,
-        MessageBody=json.dumps(body),
+        MessageBody=json.dumps(payload),
     )
 
     print("Status message sent")
