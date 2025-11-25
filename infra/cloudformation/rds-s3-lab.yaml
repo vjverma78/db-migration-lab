@@ -4,11 +4,11 @@ Parameters:
   VpcId:
     Type: String
     Description: VPC ID where resources will be deployed
-    AllowedPattern: ^vpc-[a-z0-9]{8,17}$
-    ConstraintDescription: Must be a valid VPC ID (vpc-xxxxx)
+
+
   
   DBSubnetIds:
-    Type: List<String>
+    Type: CommaDelimitedList
     Description: List of at least 2 subnet IDs for the DB subnet group (for multi-AZ)
   
   DBUsername:
@@ -17,8 +17,8 @@ Parameters:
     Description: Master username for RDS database
     MinLength: 1
     MaxLength: 63
-    AllowedPattern: ^[a-zA-Z][a-zA-Z0-9_]*$
-    ConstraintDescription: Must start with letter, contain only alphanumerics and underscores
+
+
   
   DBPassword:
     Type: String
@@ -26,18 +26,18 @@ Parameters:
     Description: Master password for RDS database
     MinLength: 8
     MaxLength: 128
-    ConstraintDescription: Must be at least 8 characters
+
   
   DBInstanceClass:
     Type: String
     Default: db.t4g.micro
     Description: RDS instance type
-    AllowedValues:
-      - db.t4g.micro
-      - db.t4g.small
-      - db.t4g.medium
-      - db.m6g.large
-    ConstraintDescription: Must be a valid RDS instance type
+    # AllowedValues:
+
+
+
+
+
   
   Environment:
     Type: String
@@ -48,6 +48,22 @@ Parameters:
       - lab
       - staging
       - prod
+  
+  AttachSecurityGroup:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Set to 'true' to attach security groups specified in SecurityGroupIds
+
+  SecurityGroupIds:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: Optional comma-separated list of existing security group IDs to attach to RDS (e.g. sg-abc,sg-def)
+
+Conditions:
+  AttachSGCondition: !Equals [ !Ref AttachSecurityGroup, 'true' ]
 
 Resources:
   ReportsBucket:
@@ -107,7 +123,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       Engine: postgres
-      EngineVersion: '18.1'
+      EngineVersion: '17.6'
       DBInstanceClass: !Ref DBInstanceClass
       AllocatedStorage: 20
       StorageType: gp2
@@ -116,7 +132,10 @@ Resources:
       MasterUserPassword: !Ref DBPassword
       DBSubnetGroupName: !Ref DBSubnetGroup
       VpcSecurityGroupIds:
-        - !GetAtt LabSecurityGroup.GroupId
+        Fn::If:
+          - AttachSGCondition
+          - !Ref SecurityGroupIds
+          - !Ref AWS::NoValue
       BackupRetentionPeriod: 0
       DeletionProtection: false
       Tags:
