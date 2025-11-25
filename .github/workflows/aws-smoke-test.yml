@@ -7,12 +7,9 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
       RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
       RDS_PORT: ${{ secrets.RDS_PORT }}
-      RDS_DB_NAME: ${{ secrets.RDS_DB_NAME }}   # postgres
+      RDS_DB_NAME: ${{ secrets.RDS_DB_NAME }}
       RDS_USERNAME: ${{ secrets.RDS_USERNAME }}
       RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
       REPORTS_BUCKET_NAME: ${{ secrets.REPORTS_BUCKET_NAME }}
@@ -20,18 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install AWS CLI and psql
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli postgresql-client
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
 
-      - name: Test S3 write
+      - name: Smoke test RDS
         run: |
-          echo "hello from github actions" > test.txt
-          aws s3 cp test.txt s3://$REPORTS_BUCKET_NAME/test-from-ci.txt
+          psql "host=${RDS_ENDPOINT} port=${RDS_PORT} dbname=${RDS_DB_NAME} user=${RDS_USERNAME} password=${RDS_PASSWORD}" -c "SELECT now();"
 
-      - name: Test RDS connection
+      - name: Smoke test S3
         run: |
-          PGPASSWORD="$RDS_PASSWORD" psql \
-            "host=$RDS_ENDPOINT port=$RDS_PORT dbname=$RDS_DB_NAME user=$RDS_USERNAME sslmode=require" \
-            -c "SELECT now();"
+          aws s3 ls "s3://${REPORTS_BUCKET_NAME}/"

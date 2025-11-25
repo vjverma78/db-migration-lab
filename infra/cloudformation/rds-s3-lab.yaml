@@ -1,0 +1,49 @@
+Description: Lab stack – RDS PostgreSQL + S3 bucket
+
+Parameters:
+  DBUsername:
+    Type: String
+    NoEcho: true
+  DBPassword:
+    Type: String
+    NoEcho: true
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+
+Resources:
+  ReportsBucket:
+    Type: AWS::S3::Bucket
+
+  LabSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow Postgres from anywhere (LAB ONLY)
+      VpcId: vpc-00ff06824bd096cc2 # TODO: replace with your VPC ID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+
+  LabPostgres:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      EngineVersion: '18.1' # or whatever version you use
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: 20
+      PubliclyAccessible: true
+      MasterUsername: !Ref DBUsername
+      MasterUserPassword: !Ref DBPassword
+      VPCSecurityGroups:
+        - !GetAtt LabSecurityGroup.GroupId
+      BackupRetentionPeriod: 0 # no backups for lab
+      DeletionProtection: false
+    DeletionPolicy: Delete # delete instance when stack is deleted
+
+Outputs:
+  BucketName:
+    Value: !Ref ReportsBucket
+  RDSEndpoint:
+    Value: !GetAtt LabPostgres.Endpoint.Address
