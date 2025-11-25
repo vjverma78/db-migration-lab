@@ -6,13 +6,6 @@ on:
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    env:
-      RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
-      RDS_PORT: ${{ secrets.RDS_PORT }}
-      RDS_DB_NAME: ${{ secrets.RDS_DB_NAME }}
-      RDS_USERNAME: ${{ secrets.RDS_USERNAME }}
-      RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
-      REPORTS_BUCKET_NAME: ${{ secrets.REPORTS_BUCKET_NAME }}
 
     steps:
       - uses: actions/checkout@v4
@@ -24,15 +17,23 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
-      - name: Install psql client
+      - name: Install dependencies (psql + awscli)
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client awscli
 
       - name: Smoke test RDS
+        env:
+          RDS_ENDPOINT: ${{ secrets.RDS_ENDPOINT }}
+          RDS_PORT: ${{ secrets.RDS_PORT }}
+          RDS_DB_NAME: ${{ secrets.RDS_DB_NAME }}
+          RDS_USERNAME: ${{ secrets.RDS_USERNAME }}
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
         run: |
           psql "host=${RDS_ENDPOINT} port=${RDS_PORT} dbname=${RDS_DB_NAME} user=${RDS_USERNAME} password=${RDS_PASSWORD}" -c "SELECT now();"
 
       - name: Smoke test S3
+        env:
+          REPORTS_BUCKET_NAME: ${{ secrets.REPORTS_BUCKET_NAME }}
         run: |
           aws s3 ls "s3://${REPORTS_BUCKET_NAME}/"
