@@ -1,49 +1,169 @@
-Description: Lab stack – RDS PostgreSQL + S3 bucket
+Description: Lab stack – RDS PostgreSQL + S3 bucket with best practices
 
 Parameters:
+  VpcId:
+    Type: String
+    Description: VPC ID where resources will be deployed
+    AllowedPattern: ^vpc-[a-z0-9]{8,17}$
+    ConstraintDescription: Must be a valid VPC ID (vpc-xxxxx)
+  
+  DBSubnetIds:
+    Type: List<String>
+    Description: List of at least 2 subnet IDs for the DB subnet group (for multi-AZ)
+  
   DBUsername:
     Type: String
     NoEcho: true
+    Description: Master username for RDS database
+    MinLength: 1
+    MaxLength: 63
+    AllowedPattern: ^[a-zA-Z][a-zA-Z0-9_]*$
+    ConstraintDescription: Must start with letter, contain only alphanumerics and underscores
+  
   DBPassword:
     Type: String
     NoEcho: true
+    Description: Master password for RDS database
+    MinLength: 8
+    MaxLength: 128
+    ConstraintDescription: Must be at least 8 characters
+  
   DBInstanceClass:
     Type: String
     Default: db.t4g.micro
+    Description: RDS instance type
+    AllowedValues:
+      - db.t4g.micro
+      - db.t4g.small
+      - db.t4g.medium
+      - db.m6g.large
+    ConstraintDescription: Must be a valid RDS instance type
+  
+  Environment:
+    Type: String
+    Default: lab
+    Description: Environment name for tagging
+    AllowedValues:
+      - dev
+      - lab
+      - staging
+      - prod
 
 Resources:
   ReportsBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Name
+          Value: reports-bucket
 
   LabSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow Postgres from anywhere (LAB ONLY)
-      VpcId: vpc-00ff06824bd096cc2 # TODO: replace with your VPC ID
+      GroupDescription: Allow Postgres from anywhere (LAB ONLY - restrict in production)
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
           CidrIp: 0.0.0.0/0
+          Description: PostgreSQL from anywhere (LAB ONLY)
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Name
+          Value: lab-postgres-sg
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Lab PostgreSQL database
+      SubnetIds: !Ref DBSubnetIds
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Name
+          Value: lab-postgres-subnet-group
 
   LabPostgres:
     Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
     Properties:
       Engine: postgres
-      EngineVersion: '18.1' # or whatever version you use
+      EngineVersion: '18.1'
       DBInstanceClass: !Ref DBInstanceClass
       AllocatedStorage: 20
+      StorageType: gp2
       PubliclyAccessible: true
       MasterUsername: !Ref DBUsername
       MasterUserPassword: !Ref DBPassword
-      VPCSecurityGroups:
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VpcSecurityGroupIds:
         - !GetAtt LabSecurityGroup.GroupId
-      BackupRetentionPeriod: 0 # no backups for lab
+      BackupRetentionPeriod: 0
       DeletionProtection: false
-    DeletionPolicy: Delete # delete instance when stack is deleted
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Name
+          Value: lab-postgres-db
 
 Outputs:
   BucketName:
+    Description: Name of the S3 reports bucket
     Value: !Ref ReportsBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketName"
+  
+  BucketArn:
+    Description: ARN of the S3 reports bucket
+    Value: !GetAtt ReportsBucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-BucketArn"
+  
   RDSEndpoint:
+    Description: PostgreSQL RDS endpoint address
     Value: !GetAtt LabPostgres.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-RDSEndpoint"
+  
+  RDSPort:
+    Description: PostgreSQL RDS port
+    Value: !GetAtt LabPostgres.Endpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-RDSPort"
+  
+  SecurityGroupId:
+    Description: Security group ID for PostgreSQL database
+    Value: !Ref LabSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-SecurityGroupId"
+  
+  DBSubnetGroupName:
+    Description: DB subnet group name
+    Value: !Ref DBSubnetGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-DBSubnetGroupName"
+  
+  DBInstanceIdentifier:
+    Description: RDS database instance identifier
+    Value: !Ref LabPostgres
+    Export:
+      Name: !Sub "${AWS::StackName}-DBInstanceId"
